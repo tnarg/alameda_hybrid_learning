@@ -1,0 +1,260 @@
+#!/usr/bin/env python
+import csv
+import random
+
+surnames = [
+    "Smith",
+    "Johnson",
+    "Williams",
+    "Brown",
+    "Jones",
+    "Garcia",
+    "Miller",
+    "Davis",
+    "Rodriguez",
+    "Martinez",
+    "Hernandez",
+    "Lopez",
+    "Gonzales",
+    "Wilson",
+    "Anderson",
+    "Thomas",
+    "Taylor",
+    "Moore",
+    "Jackson",
+    "Martin",
+    "Lee",
+    "Perez",
+    "Thompson",
+    "White",
+    "Harris",
+    "Sanchez",
+    "Clark",
+    "Ramirez",
+    "Lewis",
+    "Robinson",
+    "Walker",
+    "Young",
+    "Allen",
+    "King",
+    "Wright",
+    "Scott",
+    "Torres",
+    "Nguyen",
+    "Hill",
+    "Flores",
+    "Green",
+    "Adams",
+    "Nelson",
+    "Baker",
+    "Hall",
+    "Rivera",
+    "Campbell",
+    "Mitchell",
+    "Carter",
+    "Roberts",
+    "Gomez",
+    "Phillips",
+    "Evans",
+    "Turner",
+    "Diaz",
+    "Parker",
+    "Cruz",
+    "Edwards",
+    "Collins",
+    "Reyes",
+    "Stewart",
+    "Morris",
+    "Morales",
+    "Murphy",
+    "Cook",
+    "Rogers",
+    "Gutierrez",
+    "Ortiz",
+    "Morgan",
+    "Cooper",
+    "Peterson",
+    "Bailey",
+    "Reed",
+    "Kelly",
+    "Howard",
+    "Ramos",
+    "Kim",
+    "Cox",
+    "Ward",
+    "Richardson",
+    "Watson",
+    "Brooks",
+    "Chavez",
+    "Wood",
+    "James",
+    "Bennet",
+    "Gray",
+    "Mendoza",
+    "Ruiz",
+    "Hughes",
+    "Price",
+    "Alvarez",
+    "Castillo",
+    "Sanders",
+    "Patel",
+    "Myers",
+    "Long",
+    "Ross",
+    "Foster",
+    "Jimenez",
+]
+
+give_names = [
+    "Aaliyah",
+    "Abigail",
+    "Addison",
+    "Aiden",
+    "Alexander",
+    "Andrew",
+    "Anna",
+    "Anthony",
+    "Arianna",
+    "Aubrey",
+    "Ava",
+    "Avery",
+    "Benjamin",
+    "Brayden",
+    "Brooklyn",
+    "Cameron",
+    "Carter",
+    "Charlie",
+    "Charlotte",
+    "Chloe",
+    "Claire",
+    "Connor",
+    "Daniel",
+    "David",
+    "Eli",
+    "Elijah",
+    "Elizabeth",
+    "Ella",
+    "Ellie",
+    "Emily",
+    "Emma",
+    "Ethan",
+    "Evan",
+    "Evelyn",
+    "Gabriel",
+    "Gabriella",
+    "Gavin",
+    "Grace",
+    "Grayson",
+    "Hannah",
+    "Harper",
+    "Henry",
+    "Hunter",
+    "Isaac",
+    "Isabella",
+    "Jacob",
+    "James",
+    "Jayden",
+    "Joseph",
+    "Joshua",
+    "Kaitlyn",
+    "Kaylee",
+    "Kylie",
+    "Landon",
+    "Leah",
+    "Liam",
+    "Lillian",
+    "Lily",
+    "Lucy",
+    "Luke",
+    "Lyla",
+    "Mackenzie",
+    "Madison",
+    "Makayla",
+    "Mason",
+    "Matthew",
+    "Max",
+    "Maya",
+    "Mia",
+    "Michael",
+    "Natalie",
+    "Nathan",
+    "Nicholas",
+    "Noah",
+    "Oliver",
+    "Olivia",
+    "Owen",
+    "Peyton",
+    "Riley",
+    "Samuel",
+    "Sarah",
+    "Sofia",
+    "Sophia",
+    "Sophie",
+    "Tyler",
+    "William",
+    "Wyatt",
+    "Zachary",
+    "Zoey",
+]
+
+class Teacher(object):
+    def __init__(self, name, grade, initial_room_number):
+        self.name = name
+        self.grade = grade
+        self.initial_room_number = initial_room_number
+
+def load_teachers():
+    '''Loads a CSV of the form (grade, name, initial_room_number), and
+    returns a list of Teachers.'''
+
+    teachers = []
+    with open('teachers.csv', newline='') as csvfile:
+        reader = csv.reader(csvfile, delimiter=',', quotechar='"')
+        for row in reader:
+            grade = int(row[0])
+            name = row[1]
+            room_number = int(row[2])
+            teachers.append(Teacher(name, grade, room_number))
+    return teachers
+
+
+NUM_FAMILIES = 330
+
+if __name__ == "__main__":
+    random.seed(42)
+    teachers = load_teachers()
+
+    with open('students.csv', 'w', newline='') as students_file:
+        students = csv.writer(students_file, delimiter=',',
+                              quotechar='"', quoting=csv.QUOTE_MINIMAL)
+        with open('siblings.csv', 'w', newline='') as siblings_file:
+            siblings = csv.writer(siblings_file, delimiter=',',
+                                  quotechar='"', quoting=csv.QUOTE_MINIMAL)
+
+
+            #teacher_ctr = 0
+            for i in range(0, NUM_FAMILIES):
+                children = 0
+                children_sample = random.random()
+                if children_sample < 0.6:
+                    children = 1
+                elif children_sample < 0.95:
+                    children = 2
+                else:
+                    children = 3
+
+                surname = random.sample(surnames, 1)[0]
+                given_names = random.sample(surnames, children)
+
+                sibling_ids = []
+                for given_name in given_names:
+                    student_id = random.randint(100000,999999)
+                    teacher = random.sample(teachers, 1)[0]
+                    #teacher = teachers[teacher_ctr % len(teachers)]
+                    #teacher_ctr += 1
+                    affinity = random.randint(0,3)
+                    sibling_ids.append(student_id)
+                    students.writerow([student_id, "{} {}".format(given_name, surname), teacher.name, affinity])
+
+                if children > 1:
+                    siblings.writerow(sibling_ids)
