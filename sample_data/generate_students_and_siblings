@@ -105,7 +105,7 @@ surnames = [
     "Jimenez",
 ]
 
-give_names = [
+given_names = [
     "Aaliyah",
     "Abigail",
     "Addison",
@@ -244,10 +244,10 @@ if __name__ == "__main__":
                     children = 3
 
                 surname = random.sample(surnames, 1)[0]
-                given_names = random.sample(surnames, children)
+                given = random.sample(given_names, children)
 
                 sibling_ids = []
-                for given_name in given_names:
+                for given_name in given:
                     student_id = random.randint(100000,999999)
                     teacher = random.sample(teachers, 1)[0]
                     #teacher = teachers[teacher_ctr % len(teachers)]
