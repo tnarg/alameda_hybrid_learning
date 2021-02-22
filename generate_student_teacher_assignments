@@ -3,31 +3,10 @@
 #
 # CONSTANTS
 #
-KINDERGARTEN = 0
-FIRST_GRADE = 1
-SECOND_GRADE = 2
-THIRD_GRADE = 3
-FOURTH_GRADE = 4
-FIFTH_GRADE = 5
 
 COHORT_UNASSIGNED = 0
 COHORT_AM = 1
 COHORT_PM = 2
-
-#
-# TUNABLE PARAMETERS
-#
-TUNABLE_OPTIMIZATION_ITERATIONS = 2**25
-TUNABLE_STUDENT_LIMIT_IMBALANCE_TOLERANCE_BY_GRADE_LEVEL = {
-    KINDERGARTEN: 3,
-    FIRST_GRADE: 3,
-    SECOND_GRADE: 3,
-    THIRD_GRADE: 3,
-    FOURTH_GRADE: 3,
-    FIFTH_GRADE: 3,
-}
-TUNABLE_ROOM_CAPACITY_EXCEEDED_SCALAR = 10
-TUNABLE_ROOM_SWITCH_SCORE = 1
 
 #
 # GLOBALS
@@ -40,9 +19,9 @@ pm = 0 # global counter of number of PM students
 #
 import csv
 import itertools
-import math
-import numpy as np
 import random
+
+from hybridlearning import roomswap
 
 #
 # TYPES
@@ -89,104 +68,22 @@ def link_siblings(students, all_siblings):
             sibling_a.siblings.append(sibling_b)
             sibling_b.siblings.append(sibling_a)
 
-def compute_student_limits(students, teachers):
-    by_name = {}
+def assign_teachers_to_rooms(students, teachers, rooms):
+    if False:
+        roomswap.assign_teachers_to_rooms(students, teachers, rooms)
+    else:
+        simple_assign_teachers_to_rooms(teachers, rooms)
+
+def simple_assign_teachers_to_rooms(teachers, rooms):
     for teacher in teachers:
-        by_name[teacher.name] = teacher
-
-    for student in students:
-        teacher = by_name[student.initial_teacher_name]
-        teacher.initial_student_count += 1
-
-    for teacher in teachers:
-        teacher.student_limit = math.ceil(teacher.initial_student_count/2)
-
-def adjust_grade_level_student_imbalance(teachers):
-    by_grade = {}
-    for teacher in teachers:
-        grade_level = by_grade.setdefault(teacher.grade, [])
-        grade_level.append(teacher)
-
-    for (grade_level, grade) in by_grade.items():
-        tolerance = TUNABLE_STUDENT_LIMIT_IMBALANCE_TOLERANCE_BY_GRADE_LEVEL[grade_level]
-        while True:
-            grade.sort(key=lambda t: t.student_limit)
-            t_min = grade[0]
-            t_max = grade[-1]
-
-            if t_max.student_limit - t_min.student_limit <= tolerance:
-                break
-
-            t_max.student_limit -= 1
-            t_min.student_limit += 1
-
-ROOM_ASSIGNMENT_INVALID = 2**32 # a very large number
-
-def teacher_room_assignment_is_valid(teacher, room):
-    # TODO: maybe some room assignments are invalid
-    return True
-
-
-def score_teacher_room_assignment(teacher, room):
-    if not teacher_room_assignment_is_valid(teacher, room):
-        return ROOM_ASSIGNMENT_INVALID
-
-    score = 0
-    if teacher.student_limit > room.capacity:
-        score = (teacher.student_limit - room.capacity)*TUNABLE_ROOM_CAPACITY_EXCEEDED_SCALAR
-    elif teacher.student_limit < room.capacity:
-        score = room.capacity - teacher.student_limit
-
-    if teacher.initial_room_number != room.number:
-        score += TUNABLE_ROOM_SWITCH_SCORE
-
-    return score
-
-
-def optimize_room_assignments(teachers, rooms):
-    scores = np.zeros( (len(teachers), len(rooms)) )
-
-    initial_score = 0
-    initial_assignment = []
-    for t in range(0, len(teachers)):
-        teacher = teachers[t]
-        for r in range(0, len(rooms)):
-            room = rooms[r]
-            score = score_teacher_room_assignment(teacher, room)
-            scores[(t,r)] = score
+        for room in rooms:
             if room.number == teacher.initial_room_number:
-                initial_score += score
-                initial_assignment.append((t,r))
+                teacher.assigned_room = room
+                break
+        else:
+            raise RuntimeError(repr(teacher.initial_room_number))
 
-    # genetic algorithm, find best room assignments
-    random.seed(42) # Answer to the Ultimate Question of Life, the Universe, and Everything
-    best_score = initial_score
-    best_assignment = initial_assignment
-    n = len(best_assignment)
-    for i in range(0,TUNABLE_OPTIMIZATION_ITERATIONS):
-        x = random.randint(0,n-1)
-        y = (x + random.randint(1,n-1)) % n
-
-        xt, xr = best_assignment[x]
-        yt, yr = best_assignment[y]
-        baseline = scores[(xt,xr)] + scores[(yt,yr)]
-        mutation = scores[(xt,yr)] + scores[(yt,xr)]
-        if mutation < baseline:
-            best_assignment[x] = (xt, yr)
-            best_assignment[y] = (yt, xr)
-
-    # Update the teachers with their room assignments, checking to
-    # make sure we aren't over capacity.
-    for (t, r) in best_assignment:
-        teacher = teachers[t]
-        room = rooms[r]
-        if teacher.student_limit > room.capacity:
-            raise RuntimeError("Teacher {} exceeds room {}".format(teacher.name, room.capacity))
-
-        teacher.assigned_room = room
-
-
-def assign_siblings_to_am_pm(students):
+def assign_siblings_to_am_pm(students, alphabetic):
     global am
     global pm
     for student in students:
@@ -198,7 +95,12 @@ def assign_siblings_to_am_pm(students):
         if student.cohort != COHORT_UNASSIGNED:
             continue
 
-        if am < pm:
+        if alphabetic:
+            do_am = student.name.split(" ")[-1][0] < 'M'
+        else:
+            do_am = am <= pm
+
+        if do_am:
             am += 1 + len(student.siblings)
             student.cohort = COHORT_AM
             for sibling in student.siblings:
@@ -209,7 +111,7 @@ def assign_siblings_to_am_pm(students):
             for sibling in student.siblings:
                 sibling.cohort = COHORT_PM
 
-def assign_student(student, by_name, by_grade):
+def assign_student(student, by_name, by_grade, alphabetic):
     global am
     global pm
 
@@ -233,14 +135,14 @@ def assign_student(student, by_name, by_grade):
         if student.cohort == COHORT_AM:
             # Student MUST be in AM. try this teacher; otherwise, find
             # another teacher.
-            if len(candidate.am_students) < candidate.student_limit:
+            if len(candidate.am_students) < candidate.assigned_room.capacity:
                 candidate.am_students.append(student)
                 placed = True
                 break
         elif student.cohort == COHORT_PM:
             # Student MUST be in PM. try this teacher; otherwise, find
             # another teacher.
-            if len(candidate.pm_students) < candidate.student_limit:
+            if len(candidate.pm_students) < candidate.assigned_room.capacity:
                 candidate.pm_students.append(student)
                 placed = True
                 break
@@ -248,26 +150,43 @@ def assign_student(student, by_name, by_grade):
             #
             # Check to see if this teacher is full
             #
-            if len(candidate.am_students) < len(candidate.pm_students):
-                if len(candidate.am_students) < candidate.student_limit:
+
+            if alphabetic:
+                try_am_first = student.name.split(" ")[-1][0] < 'M'
+            else:
+                try_am_first = len(candidate.am_students) <= len(candidate.pm_students)
+
+            if try_am_first:
+                if len(candidate.am_students) < candidate.assigned_room.capacity:
                     student.cohort = COHORT_AM
                     am += 1
                     candidate.am_students.append(student)
                     placed = True
                     break
-            else:
-                if len(candidate.pm_students) < candidate.student_limit:
+                elif len(candidate.pm_students) < candidate.assigned_room.capacity:
                     student.cohort = COHORT_PM
                     pm += 1
                     candidate.pm_students.append(student)
+                    placed = True
+                    break
+            else:
+                if len(candidate.pm_students) < candidate.assigned_room.capacity:
+                    student.cohort = COHORT_PM
+                    pm += 1
+                    candidate.pm_students.append(student)
+                    placed = True
+                    break
+                elif len(candidate.am_students) < candidate.assigned_room.capacity:
+                    student.cohort = COHORT_AM
+                    am += 1
+                    candidate.am_students.append(student)
                     placed = True
                     break
 
     if not placed:
         raise RuntimeError("Unable to place {} {}".format(student.name, student.cohort))
 
-def assign_students_to_teachers(students, teachers):
-
+def assign_students_to_teachers(students, teachers, alphabetic):
     by_name = {}
     by_grade = {}
     for teacher in teachers:
@@ -289,12 +208,12 @@ def assign_students_to_teachers(students, teachers):
         # First we place students with an AM/PM COHORT
         for student in tier:
             if student.cohort != COHORT_UNASSIGNED:
-                assign_student(student, by_name, by_grade)
+                assign_student(student, by_name, by_grade, alphabetic)
 
         # Next we place the remainder of the students in the affinity tier
         for student in tier:
             if student.cohort == COHORT_UNASSIGNED:
-                assign_student(student, by_name, by_grade)
+                assign_student(student, by_name, by_grade, alphabetic)
 
 
 #
@@ -338,7 +257,7 @@ def load_teachers():
         for row in reader:
             grade = int(row[0])
             name = row[1]
-            room_number = int(row[2])
+            room_number = row[2]
             teachers.append(Teacher(name, grade, room_number))
     return teachers
 
@@ -350,7 +269,7 @@ def load_rooms():
     with open('sample_data/rooms.csv', newline='') as csvfile:
         reader = csv.reader(csvfile, delimiter=',', quotechar='"')
         for row in reader:
-            number = int(row[0])
+            number = row[0]
             capacity = int(row[1])
             rooms.append(Room(number, capacity))
     return rooms
@@ -359,20 +278,25 @@ def load_rooms():
 # MAIN
 #
 if __name__ == "__main__":
+    alphabetic = False
+
     students = load_students()
     siblings = load_siblings()
     teachers = load_teachers()
     rooms = load_rooms()
 
     link_siblings(students, siblings)
-    compute_student_limits(students, teachers)
-    adjust_grade_level_student_imbalance(teachers)
-    optimize_room_assignments(teachers, rooms)
-    assign_siblings_to_am_pm(students)
-    assign_students_to_teachers(students, teachers)
+    assign_teachers_to_rooms(students, teachers, rooms)
+    assign_siblings_to_am_pm(students, alphabetic)
+    assign_students_to_teachers(students, teachers, alphabetic)
 
     for teacher in teachers:
-        print("\n({}){}".format(teacher.grade, teacher.name))
+        teacher.am_students.sort(key=lambda s: s.name)
+        teacher.pm_students.sort(key=lambda s: s.name)
+        if teacher.initial_room_number == teacher.assigned_room.number:
+            print("\n{}: {}".format(teacher.grade, teacher.name))
+        else:
+            print("\n{}: {}: {}->{}".format(teacher.grade, teacher.name, teacher.initial_room_number, teacher.assigned_room.number))
         print("  AM:")
         for student in teacher.am_students:
             print("    ({}) {}".format(student.student_id, student.name))
