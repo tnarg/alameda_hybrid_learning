@@ -12,53 +12,27 @@
 
 3) Each classroom has a maximum capacity.
 
-4) Each teacher has an initial Classroom assignment. Assignments
-   MAY be changed, but such moves should be minimized.
+4) Each teacher has an initial Classroom assignment. We do not attempt
+   to move teachers.
 
-5) Teacher/Classroom assignment changes are preferable to
-   Student/Teacher assignment change.
-
-6) Maintaining Gender balance is also desirable.
-
-7) The number of Students assigned to each Teacher should be
-   approximately even across each grade level.
+6) Maintaining Gender balance is desirable.
 
 ## Approach
 
-Once all of the family survey data has been collected, each Teacher in
-our model will be seeded with an initial student\_limit, i.e. the
-ceiling(students\_opting\_in/2) for each teacher. At this point we
-should address any inbalance between Teachers within each grade
-level. For example, we might declare that the maximum student\_limit
-difference between any two teachers within a grade level is 3. This
-parameter is tunable
+We load the rooms, teachers, and students data. Then we group siblings
+together by home address. Once siblings have been linked together, we
+assign each set of siblings to an AM or PM cohort in pseudo-random
+order ensuring AM and PM have roughly equal distribution. Note that we
+DO NOT assign these students to a teacher in this phase.
 
-If Teacher A has student\_limit=7 and Teacher B has student\_limit=13,
-we would adjust these to be A.student\_limit=9 and
-B.student\_limit=11. This will help ensure some level of fairness among
-teachers while hopefully minimizing the number of students that are
-assigned to a new teacher.
+Next, group all students based on their affinity to their current
+teacher. There are 4 tiers of affinity (0-3), 0 being minimal
+affinity, and 3 being maximal affinity.
 
-Next, we will deal with room assignments. We will a score for each
-(teacher, room) pair. Then we will use a genetic algorithm to find a
-better set of room assignments by swapping rooms between teachers with
-the goal of reducing the overall room assignment score (lower is
-better). A Teacher/Room assignment will be scored based on:
-
-1. The validity of the room assignment (assuming some teacher/room
-   assignments are invalid)
-2. The difference between a Room.capacity and the
-   Teacher.student\_limit. A Teacher/Room assignment where a Teacher's
-   student\_limit exceeds the Room Capacity is much worse than the
-   Room Capacity exceeding the student_limit. Ultimately, if no
-   validate set of Teacher/Room assignments exists, i.e. the solution
-   with the lowest score contains Teachers assigned to Rooms where the
-   student\_limit exceeds the Capacity, we may need to adjust the
-   TUNABLE\_STUDENT\_LIMIT\_IMBALANCE\_TOLERANCE\_BY\_GRADE\_LEVEL.
-3. Whether the Teacher must switch rooms.
-
-Finally, we iterate through the students in pseudo-random order, and
-assign them to a teacher, preferring their current teacher, and
-falling back to other teachers within that grade level.
-
-
+For each tier, starting with maximal affinity, we shuffle the list of
+students. We assign all sibling students, and then all non-sibling
+students. We prefer the student's current teacher, and fall back to
+other teachers within that grade level if their current teacher is
+full. Non-sibling students are placed in whichever AM/PM cohort has
+the least students assigned so that the AM and PM sessions remain
+balanced.

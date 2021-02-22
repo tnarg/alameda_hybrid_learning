@@ -213,7 +213,7 @@ def load_teachers():
         for row in reader:
             grade = int(row[0])
             name = row[1]
-            room_number = int(row[2])
+            room_number = row[2]
             teachers.append(Teacher(name, grade, room_number))
     return teachers
 
@@ -227,34 +227,35 @@ if __name__ == "__main__":
     with open('students.csv', 'w', newline='') as students_file:
         students = csv.writer(students_file, delimiter=',',
                               quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        with open('siblings.csv', 'w', newline='') as siblings_file:
-            siblings = csv.writer(siblings_file, delimiter=',',
-                                  quotechar='"', quoting=csv.QUOTE_MINIMAL)
 
+        for i in range(0, NUM_FAMILIES):
+            children = 0
+            children_sample = random.random()
+            if children_sample < 0.6:
+                children = 1
+            elif children_sample < 0.95:
+                children = 2
+            else:
+                children = 3
 
-            #teacher_ctr = 0
-            for i in range(0, NUM_FAMILIES):
-                children = 0
-                children_sample = random.random()
-                if children_sample < 0.6:
-                    children = 1
-                elif children_sample < 0.95:
-                    children = 2
-                else:
-                    children = 3
+            surname = random.sample(surnames, 1)[0]
 
-                surname = random.sample(surnames, 1)[0]
-                given = random.sample(given_names, children)
+            ave = random.randint(27,54)
+            ave_digit = ave % 10
+            if ave_digit == 1:
+                ave_sfx = "st"
+            elif ave_digit == 2:
+                ave_sfx = "nd"
+            elif ave_digit == 3:
+                ave_sfx = "rd"
+            else:
+                ave_sfx = "th"
+            address = "{} NE {}{} AVE".format(random.randint(2001,4000), ave, ave_sfx)
 
-                sibling_ids = []
-                for given_name in given:
-                    student_id = random.randint(100000,999999)
-                    teacher = random.sample(teachers, 1)[0]
-                    #teacher = teachers[teacher_ctr % len(teachers)]
-                    #teacher_ctr += 1
-                    affinity = random.randint(0,3)
-                    sibling_ids.append(student_id)
-                    students.writerow([student_id, "{} {}".format(given_name, surname), teacher.name, affinity])
+            given = random.sample(given_names, children)
+            for given_name in given:
+                student_id = random.randint(100000,999999)
+                teacher = random.sample(teachers, 1)[0]
+                affinity = random.randint(0,3)
+                students.writerow([student_id, "{} {}".format(given_name, surname), address, teacher.name, affinity])
 
-                if children > 1:
-                    siblings.writerow(sibling_ids)

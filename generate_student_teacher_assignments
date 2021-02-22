@@ -21,15 +21,14 @@ import csv
 import itertools
 import random
 
-from hybridlearning import roomswap
-
 #
 # TYPES
 #
 class Student(object):
-    def __init__(self, name, student_id, initial_teacher_name, teacher_affinity):
-        self.name = name
+    def __init__(self, student_id, name, address, initial_teacher_name, teacher_affinity):
         self.student_id = student_id
+        self.name = name
+        self.address = address
         self.initial_teacher_name = initial_teacher_name
         self.teacher_affinity = teacher_affinity
 
@@ -56,25 +55,19 @@ class Room(object):
 #
 # ALGORITHMS
 #
-def link_siblings(students, all_siblings):
-    by_id = {}
+def link_siblings(students):
+    by_address = {}
     for student in students:
-        by_id[student.student_id] = student
+        siblings = by_address.setdefault(student.address, [])
+        siblings.append(student)
 
-    for siblings in all_siblings:
-        for (student_id_a, student_id_b) in itertools.combinations(siblings, 2):
-            sibling_a = by_id[student_id_a]
-            sibling_b = by_id[student_id_b]
-            sibling_a.siblings.append(sibling_b)
-            sibling_b.siblings.append(sibling_a)
+    for siblings in by_address.values():
+        if len(siblings) > 1:
+            for (sibling_a, sibling_b) in itertools.combinations(siblings, 2):
+                sibling_a.siblings.append(sibling_b)
+                sibling_b.siblings.append(sibling_a)
 
-def assign_teachers_to_rooms(students, teachers, rooms):
-    if False:
-        roomswap.assign_teachers_to_rooms(students, teachers, rooms)
-    else:
-        simple_assign_teachers_to_rooms(teachers, rooms)
-
-def simple_assign_teachers_to_rooms(teachers, rooms):
+def link_teachers_to_rooms(teachers, rooms):
     for teacher in teachers:
         for room in rooms:
             if room.number == teacher.initial_room_number:
@@ -230,22 +223,12 @@ def load_students():
         for row in reader:
             student_id = int(row[0])
             name = row[1]
-            teacher_name = row[2]
-            teacher_affinity = int(row[3])
+            address = row[2]
+            teacher_name = row[3]
+            teacher_affinity = int(row[4])
 
-            students.append(Student(name, student_id, teacher_name, teacher_affinity))
+            students.append(Student(student_id, name, address, teacher_name, teacher_affinity))
     return students
-
-def load_siblings():
-    '''Loads a CSV of the form (student_id, student_id, ...), and
-    returns a list of lists of student_ids.'''
-
-    siblings = []
-    with open('sample_data/siblings.csv', newline='') as csvfile:
-        reader = csv.reader(csvfile, delimiter=',', quotechar='"')
-        for row in reader:
-            siblings.append([int(student_id) for student_id in row])
-    return siblings
 
 def load_teachers():
     '''Loads a CSV of the form (grade, name, initial_room_number), and
@@ -281,12 +264,11 @@ if __name__ == "__main__":
     alphabetic = False
 
     students = load_students()
-    siblings = load_siblings()
     teachers = load_teachers()
     rooms = load_rooms()
 
-    link_siblings(students, siblings)
-    assign_teachers_to_rooms(students, teachers, rooms)
+    link_siblings(students)
+    link_teachers_to_rooms(teachers, rooms)
     assign_siblings_to_am_pm(students, alphabetic)
     assign_students_to_teachers(students, teachers, alphabetic)
 
