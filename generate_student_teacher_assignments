@@ -112,16 +112,11 @@ def assign_student(student, by_name, by_grade, alphabetic):
     # are sorted by how close to capacity they are.
     initial_teacher = by_name[student.initial_teacher_name]
     candidates = []
-    if student.teacher_affinity == 0:
-        for teacher in by_grade[initial_teacher.grade]:
+    for teacher in by_grade[initial_teacher.grade]:
+        if teacher != initial_teacher:
             candidates.append(teacher)
-        random.shuffle(candidates)
-    else:
-        for teacher in by_grade[initial_teacher.grade]:
-            if teacher != initial_teacher:
-                candidates.append(teacher)
-        candidates.sort(key=lambda t: (t.student_limit * 2) - len(t.am_students) - len(t.pm_students), reverse=True)
-        candidates.insert(0, initial_teacher)
+    candidates.sort(key=lambda t: (t.assigned_room.capacity - len(t.am_students)) + (t.assigned_room.capacity - len(t.pm_students)), reverse=True)
+    candidates.insert(0, initial_teacher)
 
     placed = False
     for candidate in candidates:
